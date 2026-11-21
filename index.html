@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My Private Library</title>
+<style>
+:root{--bg:#150d07;--glass:rgba(30,19,11,.88);--line:rgba(217,168,91,.35);--ink:#f3e6cf;--dim:#bfa27a;--gold:#d9a85b;color-scheme:dark;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:Georgia,"Noto Naskh Arabic","Traditional Arabic",serif;overflow:hidden}
+canvas#gl{display:block;width:100%;height:100%;touch-action:none}
+#vig{position:fixed;inset:0;pointer-events:none;background:radial-gradient(ellipse at center,transparent 55%,rgba(10,5,2,.55))}
+#hud{position:fixed;inset:0;pointer-events:none}
+#cross{position:absolute;left:50%;top:50%;width:7px;height:7px;margin:-3.5px;border-radius:50%;border:1.5px solid rgba(255,240,210,.75);transition:.15s}
+#cross.on{width:18px;height:18px;margin:-9px;border-color:var(--gold);box-shadow:0 0 14px var(--gold)}
+#tip{position:absolute;left:50%;top:calc(50% + 26px);transform:translateX(-50%);text-align:center;font-size:17px;opacity:0;transition:.2s;text-shadow:0 2px 8px #000;max-width:80vw}
+#tip.on{opacity:1}#tip small{display:block;color:var(--dim);font-size:12px}
+.card{background:var(--glass);border:1px solid var(--line);border-radius:12px;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px)}
+#top{position:absolute;left:14px;top:calc(14px + env(safe-area-inset-top,0px));display:flex;gap:8px;align-items:center;pointer-events:auto}
+#top .card{padding:9px 14px;font-size:14px;color:var(--dim)}
+#empty{position:absolute;left:50%;bottom:70px;transform:translateX(-50%);padding:12px 18px;text-align:center;font-size:15px;color:var(--dim);display:none;max-width:84vw}
+#help{position:absolute;left:50%;bottom:calc(14px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);color:var(--dim);font-size:13px;white-space:nowrap;text-shadow:0 1px 6px #000}
+@media(max-width:640px){#help{display:none}}
+button{font:inherit;cursor:pointer;border-radius:999px;border:1px solid var(--gold);background:rgba(217,168,91,.14);color:var(--ink);padding:9px 20px;font-size:15px}
+button:hover,button:focus-visible{background:var(--gold);color:#1e1209;outline:none}
+button.ghost{border-color:var(--line);background:none}
+button.danger{border-color:#b5523c}
+#intro{position:fixed;inset:0;z-index:20;display:flex;align-items:center;justify-content:center;text-align:center;padding:20px;background:radial-gradient(circle at 50% 38%,rgba(120,72,30,.65),rgba(14,8,4,.97))}
+#intro h1{font-size:clamp(32px,7vw,54px);font-weight:normal;margin:0 0 10px}
+#intro p{color:var(--dim);line-height:1.6;margin:0 0 22px;max-width:460px}
+#inspect{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);width:min(560px,94vw);padding:16px 20px;z-index:8;display:none;text-align:center;box-sizing:border-box}
+#inspect.on{display:block}
+#inspect h2{margin:0 0 2px;font-size:23px;font-weight:normal}#inspect .m{color:var(--dim);font-size:13px;margin-bottom:12px}
+.row{display:flex;gap:9px;flex-wrap:wrap;justify-content:center}
+#dlg{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);width:min(420px,92vw);padding:22px;z-index:12;display:none;max-height:90vh;overflow:auto;box-sizing:border-box}
+#dlg.on{display:block}#dlg h2{margin:0 0 6px;font-size:24px;font-weight:normal}
+#dlg label{display:block;margin:12px 0 4px;color:var(--dim);font-size:14px}
+#dlg input[type=text],#dlg select{width:100%;box-sizing:border-box;background:rgba(0,0,0,.35);border:1px solid var(--line);border-radius:8px;color:var(--ink);padding:9px;font:inherit;font-size:16px}
+#dlg input[type=file]{color:var(--dim);font-size:13px;max-width:100%}
+#dlg .n{font-size:12px;color:var(--dim);margin-top:6px;line-height:1.5}#dmsg{min-height:18px;margin:12px 0 4px;color:var(--gold);font-size:14px}
+#toast{position:fixed;left:50%;top:calc(70px + env(safe-area-inset-top,0px));transform:translateX(-50%);z-index:30;padding:10px 18px;display:none;font-size:15px;max-width:88vw;text-align:center}
+/* reader */
+#reader{position:fixed;inset:0;z-index:15;display:none;flex-direction:column;background:radial-gradient(ellipse at 50% 40%,#5a3a22,#24150b 70%,#120a05)}
+#reader.on{display:flex}
+#rtop{display:flex;align-items:center;gap:12px;padding:10px 14px;padding-top:calc(10px + env(safe-area-inset-top,0px))}
+#rtitle{flex:1;font-size:17px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+#stage{flex:1;min-height:0;overflow:auto;display:flex;perspective:none}
+#book{margin:auto;padding:12px;border-radius:7px;background:linear-gradient(#4a2c19,#34200f);box-shadow:0 30px 70px #000,0 0 0 1px #000,inset 0 0 0 2px rgba(217,168,91,.18);position:relative}
+#book:after{content:"";position:absolute;left:8px;right:8px;bottom:-7px;height:7px;border-radius:0 0 4px 4px;background:repeating-linear-gradient(#e8dcc0 0 1px,#bba98a 1px 2px);box-shadow:0 8px 18px #000}
+#pages{position:relative;display:flex;perspective:2600px}
+.slot{background:#f3ead4;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.slot canvas,.face canvas{display:block;background:#fff}
+.slot.empty,.face.empty{background:#2a1a0f}.slot.empty canvas,.face.empty canvas{display:none}
+#sL:after,#sR:before{content:"";position:absolute;top:0;bottom:0;width:9%;pointer-events:none}
+#sL:after{right:0;background:linear-gradient(90deg,transparent,rgba(60,35,10,.32))}
+#sR:before{left:0;background:linear-gradient(270deg,transparent,rgba(60,35,10,.32))}
+#leaf{position:absolute;top:0;display:none;transform-style:preserve-3d}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden;background:#f3ead4;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.face.b{transform:rotateY(180deg)}
+#rbar{display:flex;gap:8px;align-items:center;justify-content:center;flex-wrap:wrap;padding:10px 14px;padding-bottom:calc(10px + env(safe-area-inset-bottom,0px));background:rgba(15,9,4,.6)}
+#rbar button{padding:6px 14px;font-size:15px}
+#slider{flex:1;min-width:120px;max-width:420px;accent-color:var(--gold)}#rpage{min-width:120px;text-align:center;font-size:14px;color:var(--dim)}
+#spin{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none;color:var(--ink);padding:12px 20px}
+</style>
+</head>
+<body>
+<canvas id="gl"></canvas><div id="vig"></div>
+<div id="hud">
+  <div id="cross"></div><div id="tip"></div>
+  <div id="top"><button id="addbtn" class="card">+ Add PDF</button><div id="count" class="card">0 books</div></div>
+  <div id="empty" class="card">Both shelves are empty. Press “+ Add PDF” (or B) to put your first book on them.</div>
+  <div id="help">WASD to walk · mouse to look · click a book to pick it up · B adds a PDF · Esc frees the cursor</div>
+</div>
+
+<div id="inspect" class="card"><h2 id="ititle" dir="auto"></h2><div class="m" id="imeta"></div>
+  <div class="row"><button id="iread">Read</button><button id="iedit" class="ghost">Edit</button><button id="idel" class="ghost danger">Remove</button><button id="iback" class="ghost">Put back</button></div></div>
+
+<div id="dlg" class="card" role="dialog">
+  <h2 id="dh">Add PDF books</h2>
+  <div id="frow"><label for="df">PDF files</label><input id="df" type="file" accept="application/pdf,.pdf" multiple></div>
+  <label for="dt">Title</label><input id="dt" type="text" dir="auto" maxlength="90">
+  <div class="n" id="dtn">With several files, each file name is used as its title.</div>
+  <label for="dd">Reading direction</label><select id="dd"><option value="auto">Automatic</option><option value="ltr">Left to right</option><option value="rtl">Right to left (Arabic)</option></select>
+  <label for="dc">Cover image (optional)</label><input id="dc" type="file" accept="image/*">
+  <div class="n" id="dcn">Without one, the cover is taken from the first page of your PDF.</div>
+  <label id="dclrow" style="display:none"><input id="dclr" type="checkbox"> Use the PDF’s first page as the cover again</label>
+  <div id="dmsg"></div>
+  <div class="row" style="justify-content:flex-start"><button id="dsave">Save</button><button id="dcancel" class="ghost">Cancel</button></div>
+</div>
+
+<div id="reader">
+  <div id="rtop"><button id="rback" class="ghost">← Back to library</button><span id="rtitle" dir="auto"></span></div>
+  <div id="stage"><div id="book"><div id="pages">
+    <div class="slot" id="sL"><canvas></canvas></div><div class="slot" id="sR"><canvas></canvas></div>
+    <div id="leaf"><div class="face f"><canvas></canvas></div><div class="face b"><canvas></canvas></div></div>
+  </div></div></div>
+  <div id="spin" class="card">Opening…</div>
+  <div id="rbar"><button id="pl" aria-label="Turn page left">◀</button><input id="slider" type="range" min="1" max="1" value="1"><button id="pr" aria-label="Turn page right">▶</button><span id="rpage"></span>
+    <button id="zm">−</button><button id="zp">+</button><button id="zf">Fit</button><button id="rdir">Direction</button><button id="fs">Fullscreen</button></div>
+</div>
+<div id="toast" class="card"></div>
+
+<div id="intro"><div><h1>My Private Library</h1><p>Two empty shelves, waiting for your own books. Add a PDF and it appears as a real book you can pick up and read, with facing pages that turn.</p><button id="enter">Step inside</button></div></div>
+
+<script src="libs/three.min.js"></script>
+<script src="libs/pdf.min.js"></script>
+<script src="libs/pdf.worker.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const AR=/[\u0600-\u06FF]/,isAr=s=>AR.test(s||"");
+const FF='"Noto Naskh Arabic","Traditional Arabic",Georgia,serif';
+const cvs=(w,h,f)=>{const c=document.createElement("canvas");c.width=w;c.height=h;f(c.getContext("2d"),w,h);return c};
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function toast(m,ms=3500){const t=$("toast");t.textContent=m;t.style.display="block";clearTimeout(toast.t);toast.t=setTimeout(()=>t.style.display="none",ms)}
+try{pdfjsLib.GlobalWorkerOptions.workerSrc="libs/pdf.worker.min.js"}catch(e){}
+
+/* ---------- storage (IndexedDB) ---------- */
+const DB={db:null,mem:new Map(),
+ async open(){try{this.db=await new Promise((ok,no)=>{const r=indexedDB.open("private-library-pdf",1);r.onupgradeneeded=()=>r.result.createObjectStore("books",{keyPath:"id"});r.onsuccess=()=>ok(r.result);r.onerror=()=>no(r.error)})}catch(e){this.db=null}},
+ tx(mode,f){return new Promise((ok,no)=>{const t=this.db.transaction("books",mode),r=f(t.objectStore("books"));t.oncomplete=()=>ok(r&&r.result);t.onerror=t.onabort=()=>no(t.error)})},
+ async all(){return this.db?((await this.tx("readonly",s=>s.getAll()))||[]):[...this.mem.values()]},
+ async put(rec){this.mem.set(rec.id,rec);if(this.db)await this.tx("readwrite",s=>s.put(rec))},
+ async del(id){this.mem.delete(id);if(this.db)await this.tx("readwrite",s=>s.delete(id))}};
+
+/* ---------- renderer & environment ---------- */
+const gl=$("gl"),rd=new THREE.WebGLRenderer({canvas:gl,antialias:true});
+rd.setPixelRatio(Math.min(devicePixelRatio,2));rd.setSize(innerWidth,innerHeight);
+rd.outputEncoding=THREE.sRGBEncoding;rd.toneMapping=THREE.ACESFilmicToneMapping;rd.toneMappingExposure=1.25;
+rd.shadowMap.enabled=true;rd.shadowMap.type=THREE.PCFSoftShadowMap;
+const scene=new THREE.Scene();scene.background=new THREE.Color(0x120a05);scene.fog=new THREE.Fog(0x1a0f07,6,14);
+const cam=new THREE.PerspectiveCamera(68,innerWidth/innerHeight,.04,40);cam.rotation.order="YXZ";cam.position.set(0,1.6,2.0);
+(function(){const e=new THREE.Scene(),mk=(c,s)=>new THREE.MeshBasicMaterial({color:new THREE.Color(c[0]*s,c[1]*s,c[2]*s),side:THREE.DoubleSide});
+ e.add(new THREE.Mesh(new THREE.BoxGeometry(12,7,12),new THREE.MeshBasicMaterial({color:0x4a3322,side:THREE.BackSide})));
+ const w=new THREE.Mesh(new THREE.PlaneGeometry(3,3.4),mk([1,.9,.7],7));w.position.set(0,0,-5.9);e.add(w);
+ for(const x of [-2.5,2.5]){const l=new THREE.Mesh(new THREE.PlaneGeometry(.5,4),mk([1,.75,.45],4));l.position.set(x*2,.5,0);l.rotation.y=Math.PI/2;e.add(l)}
+ const c=new THREE.Mesh(new THREE.PlaneGeometry(6,6),mk([1,.85,.6],1.2));c.position.y=3.4;c.rotation.x=Math.PI/2;e.add(c);
+ scene.environment=new THREE.PMREMGenerator(rd).fromScene(e,.03).texture})();
+
+/* ---------- procedural textures ---------- */
+const TX=(c,rx=1,ry=1,srgb=true)=>{const t=new THREE.CanvasTexture(c);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.repeat.set(rx,ry);t.anisotropy=8;if(srgb)t.encoding=THREE.sRGBEncoding;return t};
+const noise=(x,w,h,a)=>{const id=x.getImageData(0,0,w,h),d=id.data;for(let i=0;i<d.length;i+=4){const n=(Math.random()-.5)*a;d[i]+=n;d[i+1]+=n;d[i+2]+=n}x.putImageData(id,0,0)};
+function grain(x,S,x0,y0,w,h,dark,n,a){x.save();x.beginPath();x.rect(x0,y0,w,h);x.clip();
+ for(let i=0;i<n;i++){const yy=y0+Math.random()*h,amp=1+Math.random()*7,fr=.002+Math.random()*.007,ph=Math.random()*6.28;x.strokeStyle=`rgba(${dark},${a*(.3+Math.random()*.7)})`;x.lineWidth=.5+Math.random()*2;x.beginPath();for(let k=x0;k<=x0+w+16;k+=16){const y=yy+Math.sin(k*fr+ph)*amp;k===x0?x.moveTo(k,y):x.lineTo(k,y)}x.stroke()}x.restore()}
+const woodCv=(S,base,dark)=>cvs(S,S,(x)=>{x.fillStyle=base;x.fillRect(0,0,S,S);grain(x,S,0,0,S,S,dark,380,.3);
+ for(let k=0;k<3;k++){const cx=Math.random()*S,cy=Math.random()*S;for(let r=4;r<46;r+=5){x.strokeStyle=`rgba(${dark},.12)`;x.beginPath();x.ellipse(cx,cy,r*3.2,r*.9,0,0,6.3);x.stroke()}}noise(x,S,S,16)});
+const walnut=woodCv(1024,"#6a4128","30,16,7"),walnutTex=TX(walnut,1,1),walnutBump=TX(walnut,1,1,false);
+const oakTex=(()=>{const c=cvs(1024,1024,(x)=>{for(let r=0;r<8;r++){const off=Math.random()*512;for(let k=-1;k<3;k++){const px=off+k*512-512*0,py=r*128,l=hsl();x.fillStyle=l;x.fillRect(px,py,512,128);grain(x,1024,px,py,512,128,"60,32,12",22,.35)}}
+ x.fillStyle="rgba(20,10,4,.75)";for(let r=0;r<8;r++)x.fillRect(0,r*128,1024,2);noise(x,1024,1024,14)});return c;function hsl(){const l=46+Math.random()*10;return`hsl(${28+Math.random()*6},${48+Math.random()*8}%,${l}%)`}})();
+const floorTex=TX(oakTex,2.8,3.2),floorBump=TX(oakTex,2.8,3.2,false);
+const plasterCv=cvs(512,512,(x)=>{x.fillStyle="#d8c3a0";x.fillRect(0,0,512,512);for(let i=0;i<90;i++){const g=x.createRadialGradient(0,0,0,0,0,1);const px=Math.random()*512,py=Math.random()*512,r=30+Math.random()*90;const gr=x.createRadialGradient(px,py,0,px,py,r);gr.addColorStop(0,`rgba(${Math.random()<.5?'255,240,210':'120,90,55'},.08)`);gr.addColorStop(1,"rgba(0,0,0,0)");x.fillStyle=gr;x.fillRect(px-r,py-r,r*2,r*2)}noise(x,512,512,18)});
+const plasterTex=TX(plasterCv,.5,.5),plasterBump=TX(plasterCv,.5,.5,false);
+const backCv=cvs(1024,1024,(x)=>{x.drawImage(woodCv(1024,"#3a2214","12,6,2"),0,0);
+ const H0=.13,span=2.31,Y=v=>(1-(v-H0)/span)*1024;
+ for(let i=0;i<6;i++){const top=H0+i*.39+.36,bot=H0+i*.39;let g=x.createLinearGradient(0,Y(top),0,Y(top-.14));g.addColorStop(0,"rgba(0,0,0,.8)");g.addColorStop(1,"rgba(0,0,0,0)");x.fillStyle=g;x.fillRect(0,Y(top),1024,Y(top-.14)-Y(top));
+  g=x.createLinearGradient(0,Y(bot),0,Y(bot+.07));g.addColorStop(0,"rgba(0,0,0,.45)");g.addColorStop(1,"rgba(0,0,0,0)");x.fillStyle=g;x.fillRect(0,Y(bot+.07),1024,Y(bot)-Y(bot+.07))}
+ for(const cx of [0,512,1024]){const g=x.createLinearGradient(cx-70,0,cx+70,0);g.addColorStop(0,"rgba(0,0,0,0)");g.addColorStop(.5,"rgba(0,0,0,.55)");g.addColorStop(1,"rgba(0,0,0,0)");x.fillStyle=g;x.fillRect(cx-70,0,140,1024)}});
+const backTex=TX(backCv,1,1);
+const paperTex=TX(cvs(32,64,(x,w,h)=>{x.fillStyle="#eee2c4";x.fillRect(0,0,w,h);for(let y=0;y<h;y+=2){x.fillStyle=`rgba(120,95,60,${.25+Math.random()*.2})`;x.fillRect(0,y,w,1)}}),1,1);
+
+/* ---------- materials ---------- */
+const wood=new THREE.MeshPhysicalMaterial({map:walnutTex,bumpMap:walnutBump,bumpScale:.6,roughness:.5,clearcoat:.35,clearcoatRoughness:.4,envMapIntensity:.7});
+const woodDark=wood.clone();woodDark.color=new THREE.Color(.55,.5,.45);
+const sage=new THREE.MeshStandardMaterial({color:0x3a5144,roughness:.7,envMapIntensity:.3}),panelM=new THREE.MeshStandardMaterial({color:0x44604f,roughness:.65,envMapIntensity:.3}),cream=new THREE.MeshStandardMaterial({color:0xe6d8b8,roughness:.6});
+const plaster=new THREE.MeshStandardMaterial({map:plasterTex,bumpMap:plasterBump,bumpScale:.5,roughness:.95,envMapIntensity:.2});
+const ledM=new THREE.MeshBasicMaterial({color:new THREE.Color(1.6,1.15,.6)});
+function WB(w,h,d,m,x,y,z,p,grainAxis){const g=new THREE.BoxGeometry(w,h,d),uv=g.attributes.uv,dm=[[d,h,"z","y"],[d,h,"z","y"],[w,d,"x","z"],[w,d,"x","z"],[w,h,"x","y"],[w,h,"x","y"]];
+ for(let f=0;f<6;f++){const[a,b,,bn]=dm[f],sw=grainAxis&&bn===grainAxis;for(let i=0;i<4;i++){const k=f*4+i,u=uv.getX(k),v=uv.getY(k);sw?uv.setXY(k,v*b/.9,u*a/.9):uv.setXY(k,u*a/.9,v*b/.9)}}
+ const o=new THREE.Mesh(g,m);o.position.set(x,y,z);o.castShadow=o.receiveShadow=true;(p||scene).add(o);return o}
+
+/* ---------- room (compact) ---------- */
+const RW=5.6,RD=6.4,RH=3.3;
+const floor=new THREE.Mesh(new THREE.PlaneGeometry(RW,RD),new THREE.MeshPhysicalMaterial({map:floorTex,bumpMap:floorBump,bumpScale:.4,roughness:.38,clearcoat:.5,clearcoatRoughness:.25,envMapIntensity:.9}));
+floor.rotation.x=-Math.PI/2;floor.receiveShadow=true;scene.add(floor);
+const ceil=new THREE.Mesh(new THREE.PlaneGeometry(RW,RD),new THREE.MeshStandardMaterial({color:0xe3d3b3,roughness:.95}));ceil.rotation.x=Math.PI/2;ceil.position.y=RH;ceil.receiveShadow=true;scene.add(ceil);
+for(const z of [-1.8,0,1.8])WB(RW,.18,.22,wood,0,RH-.09,z,null,"x");
+function plane(w,h,x,y,z,ry){const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),plaster);m.position.set(x,y,z);m.rotation.y=ry;m.receiveShadow=true;scene.add(m)}
+plane(RD,RH,-RW/2,RH/2,0,Math.PI/2);plane(RD,RH,RW/2,RH/2,0,-Math.PI/2);plane(RW,RH,0,RH/2,RD/2,Math.PI);
+// back wall with arched window
+{const s=new THREE.Shape();s.moveTo(-RW/2,0);s.lineTo(RW/2,0);s.lineTo(RW/2,RH);s.lineTo(-RW/2,RH);s.closePath();
+ const h=new THREE.Path();h.moveTo(-.75,1.15);h.lineTo(.75,1.15);h.lineTo(.75,2.35);h.absarc(0,2.35,.75,0,Math.PI,false);h.lineTo(-.75,1.15);s.holes.push(h);
+ const g=new THREE.ExtrudeGeometry(s,{depth:.3,bevelEnabled:false}),m=new THREE.Mesh(g,plaster);m.position.z=-RD/2-.3;m.receiveShadow=true;scene.add(m);
+ const sky=new THREE.Mesh(new THREE.PlaneGeometry(2.4,3.6),new THREE.MeshBasicMaterial({map:TX(cvs(64,128,(x,w,h)=>{const g=x.createLinearGradient(0,0,0,h);g.addColorStop(0,"#bcd7ee");g.addColorStop(1,"#fff0cf");x.fillStyle=g;x.fillRect(0,0,w,h)}),1,1),color:new THREE.Color(1.5,1.4,1.25)}));sky.position.set(0,2.2,-RD/2-.22);scene.add(sky);
+ const fm=woodDark;WB(.07,2.45,.06,fm,0,2.0,-RD/2-.06,null,"y");WB(1.5,.06,.06,fm,0,1.8,-RD/2-.06,null,"x");WB(1.62,.07,.16,wood,0,1.12,-RD/2+.0,null,"x");
+ WB(.08,1.2,.08,fm,-.75,1.75,-RD/2-.05,null,"y");WB(.08,1.2,.08,fm,.75,1.75,-RD/2-.05,null,"y");
+ const arc=new THREE.Mesh(new THREE.TorusGeometry(.75,.04,10,40,Math.PI),fm);arc.position.set(0,2.35,-RD/2-.05);arc.castShadow=true;scene.add(arc)}
+// wainscot + baseboard + crown (architecture only)
+function trim(len,x,z,ry){const g=new THREE.Group();g.position.set(x,0,z);g.rotation.y=ry;scene.add(g);
+ WB(len,.95,.03,sage,0,.475,.015,g);WB(len,.05,.06,cream,0,.975,.03,g);WB(len,.14,.045,cream,0,.07,.022,g);WB(len,.07,.08,cream,0,RH-.035,.04,g);WB(len,.04,.05,cream,0,RH-.1,.025,g);
+ const n=Math.floor(len/.75),pw=len/n-.12;for(let i=0;i<n;i++){const cx=-len/2+(i+.5)*len/n;WB(pw,.6,.015,panelM,cx,.52,.035,g);WB(pw+.04,.03,.025,cream,cx,.83,.04,g);WB(pw+.04,.03,.025,cream,cx,.2,.04,g)}}
+trim(RW,0,-RD/2,0);trim(RW,0,RD/2,Math.PI);trim(RD,-RW/2,0,Math.PI/2);trim(RD,RW/2,0,-Math.PI/2);
+
+/* ---------- the two bookshelves ---------- */
+const SW=2.9,SH=2.55,SD=.42,ST=.035,PITCH=.39,BASE=.13;
+function makeShelf(x,ry){const g=new THREE.Group();g.position.set(x,0,0);g.rotation.y=ry;scene.add(g);
+ WB(ST,SH-.06,SD,wood,-SW/2+ST/2,(SH-.06)/2+.03,0,g,"y");WB(ST,SH-.06,SD,wood,SW/2-ST/2,(SH-.06)/2+.03,0,g,"y");
+ const back=new THREE.Mesh(new THREE.PlaneGeometry(SW-2*ST,2.31),new THREE.MeshStandardMaterial({map:backTex,roughness:.75,envMapIntensity:.3}));back.position.set(0,BASE+1.155,-SD/2+.01);back.receiveShadow=true;g.add(back);
+ WB(SW-.02,.1,SD-.08,woodDark,0,.05,-.02,g,"x");WB(SW+.03,.03,SD+.02,wood,0,.015,0,g,"x");
+ for(let i=0;i<=6;i++){const y=.1+i*PITCH+.015;WB(SW-2*ST,.03,SD-.02,wood,0,y,-.01,g,"x");WB(SW-2*ST,.018,.014,wood,0,y-.012,SD/2-.011,g,"x");
+  if(i>0&&i<=6){const l=new THREE.Mesh(new THREE.BoxGeometry(SW-2*ST-.06,.006,.014),ledM);l.position.set(0,y-.03,SD/2-.07);g.add(l)}}
+ WB(.025,6*PITCH-.03,SD-.02,wood,0,BASE+1.155,-.01,g,"y");
+ WB(SW+.06,.07,SD+.04,wood,0,2.505,0,g,"x");WB(SW+.12,.035,SD+.09,wood,0,2.5575+.01,.0,g,"x");WB(SW+.09,.04,.04,woodDark,0,2.46,SD/2+.01,g,"x");
+ g.updateMatrixWorld(true);return g}
+const SHELF=[makeShelf(-(RW/2-SD/2-.03),Math.PI/2),makeShelf(RW/2-SD/2-.03,-Math.PI/2)];
+const segs=[];for(let s=0;s<2;s++){const list=[];for(const r of [3,2,4,1,5,0])for(const [a,b] of [[-SW/2+ST+.012,-.0125-.012],[.0125+.012,SW/2-ST-.012]])list.push({y:BASE+r*PITCH,x0:a,x1:b})
+ segs.push(list)}
+
+/* ---------- lights ---------- */
+scene.add(new THREE.HemisphereLight(0xffe6c4,0x5a3a20,.55));
+const sun=new THREE.DirectionalLight(0xffd7a0,1.3);sun.position.set(.8,3.1,-2.9);sun.target.position.set(0,0,-.5);sun.castShadow=true;sun.shadow.mapSize.set(2048,2048);Object.assign(sun.shadow.camera,{left:-4,right:4,top:4,bottom:-4,near:.5,far:9});sun.shadow.camera.updateProjectionMatrix();sun.shadow.bias=-.0006;sun.shadow.normalBias=.02;scene.add(sun,sun.target);
+for(const s of [-1,1]){const sp=new THREE.SpotLight(0xffc88a,1.7,7,.8,.75,1.2);sp.position.set(s*1.05,3.0,0);sp.target.position.set(s*2.6,1.25,0);sp.castShadow=true;sp.shadow.mapSize.set(1024,1024);sp.shadow.bias=-.0004;sp.shadow.normalBias=.015;sp.shadow.camera.near=.4;sp.shadow.camera.far=6;scene.add(sp,sp.target)}
+const fillL=new THREE.PointLight(0xffb878,.5,7,1.4);fillL.position.set(0,2.6,.8);scene.add(fillL);
+const patch=new THREE.Mesh(new THREE.PlaneGeometry(1.9,3.3),new THREE.MeshBasicMaterial({map:TX(cvs(256,440,(x,w,h)=>{const g=x.createRadialGradient(w/2,h*.4,10,w/2,h*.4,h*.7);g.addColorStop(0,"rgba(255,225,160,.9)");g.addColorStop(1,"rgba(255,225,160,0)");x.fillStyle=g;x.fillRect(0,0,w,h);x.fillStyle="rgba(0,0,0,.55)";x.fillRect(w/2-4,0,8,h);x.fillRect(0,h*.35,w,8);x.globalCompositeOperation="destination-in";const m=x.createLinearGradient(0,0,0,h);m.addColorStop(0,"rgba(0,0,0,1)");m.addColorStop(1,"rgba(0,0,0,0)");x.fillStyle=m;x.fillRect(0,0,w,h)}),1,1),transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,opacity:.5}));
+patch.rotation.x=-Math.PI/2;patch.position.set(0,.012,-1.2);scene.add(patch);
+const dp=[];for(let i=0;i<90;i++)dp.push((Math.random()-.5)*1.6,.4+Math.random()*2.4,-2.9+Math.random()*3.4);
+const dg=new THREE.BufferGeometry();dg.setAttribute("position",new THREE.Float32BufferAttribute(dp,3));
+const dust=new THREE.Points(dg,new THREE.PointsMaterial({color:0xffe3b0,size:.012,transparent:true,opacity:.6,depthWrite:false}));scene.add(dust);
+
+/* ---------- books ---------- */
+const BK=[];let held=null;const bookGroups=[];
+const loadImg=src=>new Promise((ok,no)=>{const i=new Image();i.onload=()=>ok(i);i.onerror=no;i.src=src});
+function coverCv(img,aspect,rtl){const w=420,h=Math.round(w*aspect);return cvs(w,h,(x)=>{const s=Math.max(w/img.width,h/img.height);x.drawImage(img,(w-img.width*s)/2,(h-img.height*s)/2,img.width*s,img.height*s);
+ const g=x.createLinearGradient(rtl?w:0,0,rtl?w*.93:w*.07,0);g.addColorStop(0,"rgba(0,0,0,.5)");g.addColorStop(.5,"rgba(255,255,255,.1)");g.addColorStop(1,"rgba(0,0,0,0)");x.fillStyle=g;x.fillRect(0,0,w,h);
+ const g2=x.createLinearGradient(0,0,w,h);g2.addColorStop(0,"rgba(255,255,255,.1)");g2.addColorStop(.5,"rgba(255,255,255,0)");x.fillStyle=g2;x.fillRect(0,0,w,h)})}
+function leatherColor(c){const t=cvs(4,4,(x)=>x.drawImage(c,0,0,4,4)).getContext("2d").getImageData(0,0,4,4).data;let r=0,g=0,b=0;for(let i=0;i<64;i+=4){r+=t[i];g+=t[i+1];b+=t[i+2]}
+ const col=new THREE.Color().setRGB(r/1020,g/1020,b/1020),hs={};col.getHSL(hs);return`hsl(${Math.round(hs.h*360)},${Math.round(clamp(hs.s,.25,.6)*100)}%,${Math.round(clamp(hs.l*.7,.15,.3)*100)}%)`}
+function spineCv(title,T,Hh,col){const w=Math.round(Math.min(192,2048*T/Hh)),h=Math.round(w*Hh/T);
+ return cvs(w,h,(x)=>{x.fillStyle=col;x.fillRect(0,0,w,h);const g=x.createLinearGradient(0,0,w,0);g.addColorStop(0,"rgba(0,0,0,.5)");g.addColorStop(.3,"rgba(255,255,255,.15)");g.addColorStop(.62,"rgba(0,0,0,.04)");g.addColorStop(1,"rgba(0,0,0,.5)");x.fillStyle=g;x.fillRect(0,0,w,h);
+  for(let i=0;i<w*h/50;i++){x.fillStyle=`rgba(${Math.random()<.5?"0,0,0":"255,255,255"},${Math.random()*.06})`;x.fillRect(Math.random()*w,Math.random()*h,1.5,1.5)}
+  x.fillStyle="#d9b56a";for(const y of [h*.035,h*.035+w*.12,h*.965-w*.025,h*.965-w*.145])x.fillRect(w*.08,y,w*.84,Math.max(2,w*.025));
+  x.save();x.translate(w/2,h/2);x.rotate(Math.PI/2);x.textAlign="center";x.textBaseline="middle";x.direction=isAr(title)?"rtl":"ltr";x.fillStyle="#f0d18a";x.shadowColor="rgba(0,0,0,.6)";x.shadowBlur=3;
+  const L=h*.8;let fs=Math.min(w*.52,48),t=title;x.font=`bold ${fs}px ${FF}`;while(x.measureText(t).width>L&&fs>10){fs--;x.font=`bold ${fs}px ${FF}`}
+  while(x.measureText(t).width>L&&t.length>3){t=t.slice(0,-2)}if(t!==title)t+="…";x.fillText(t,0,0);x.restore()})}
+function dims(rec){const Wb=.165;return{T:clamp(.026+rec.pages*.00012,.026,.07),H:clamp(Wb*rec.aspect,.21,.345),D:Wb}}
+async function makeBook(rec){
+ const{T,H,D}=dims(rec),c=.003,fx=rec.rtl?-1:1;
+ let src=rec.cover?URL.createObjectURL(rec.cover):rec.autoCover;let img;try{img=await loadImg(src)}catch(e){img=null}if(rec.cover)URL.revokeObjectURL(src);
+ const cc=img?coverCv(img,H/D,rec.rtl):cvs(8,8,x=>{x.fillStyle="#3a2214";x.fillRect(0,0,8,8)});
+ const col=leatherColor(cc);const tc=new THREE.CanvasTexture(cc);tc.encoding=THREE.sRGBEncoding;tc.anisotropy=8;
+ const ts=new THREE.CanvasTexture(spineCv(rec.title,T,H,col));ts.encoding=THREE.sRGBEncoding;ts.anisotropy=8;
+ const leather=new THREE.MeshStandardMaterial({color:new THREE.Color(col),roughness:.6,envMapIntensity:.35}),coverM=new THREE.MeshStandardMaterial({map:tc,roughness:.45,envMapIntensity:.45}),spineM=new THREE.MeshStandardMaterial({map:ts,roughness:.55,envMapIntensity:.4}),pageM=new THREE.MeshStandardMaterial({map:paperTex,roughness:.9});
+ const g=new THREE.Group(),add=(w,h,d,m,x,y,z)=>{const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);o.castShadow=o.receiveShadow=true;g.add(o)};
+ const fm=Array(6).fill(leather);fm[rec.rtl?1:0]=coverM;add(c,H,D,fm,fx*(T/2-c/2),0,0);add(c,H,D,leather,-fx*(T/2-c/2),0,0);
+ const sm=Array(6).fill(leather);sm[4]=spineM;add(T,H,c,sm,0,0,D/2-c/2);add(T-2*c-.001,H-.008,D-c-.006,pageM,0,0,-c/2-.003);
+ g.userData={id:rec.id,hov:0,mats:[leather,coverM,spineM],T,H,D,rtl:rec.rtl};return g}
+function layout(){const cur=[0,0].map(()=>({i:0,x:null}));BK.sort((a,b)=>a.rec.added-b.rec.added);let overflow=0;
+ BK.forEach((b,idx)=>{const s=idx%2,{T,H,D}=b.g.userData,L=segs[s],st=cur[s];
+  while(st.i<L.length){const sg=L[st.i];if(st.x===null)st.x=sg.x0;if(st.x+T<=sg.x1)break;st.i++;st.x=null}
+  if(st.i>=L.length){b.home=null;b.g.visible=false;overflow++;return}
+  const sg=L[st.i],lx=st.x+T/2;st.x+=T+.002;b.g.visible=true;
+  const p=new THREE.Vector3(lx,sg.y+H/2+.001,SD/2-.04-D/2+(Math.random()-.5)*.01);SHELF[s].localToWorld(p);
+  b.home={p,q:SHELF[s].quaternion.clone(),n:new THREE.Vector3(0,0,1).applyQuaternion(SHELF[s].quaternion)};
+  if(b.g!==held){b.g.position.copy(p);b.g.quaternion.copy(b.home.q)}});
+ if(overflow)toast(overflow+" book(s) don’t fit on the shelves yet. Remove some to make room.");
+ $("count").textContent=BK.length+(BK.length===1?" book":" books");$("empty").style.display=BK.length?"none":"block"}
+function disposeG(g){g.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material){const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>{m.map&&m.map.dispose();m.dispose()})}})}
+async function addBook(rec){const g=await makeBook(rec);scene.add(g);bookGroups.push(g);BK.push({rec,g,home:null})}
+async function rebuild(b){const idx=bookGroups.indexOf(b.g);scene.remove(b.g);disposeG(b.g);b.g=await makeBook(b.rec);scene.add(b.g);bookGroups[idx]=b.g}
+
+/* ---------- PDF ingest ---------- */
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,6);
+async function coverFromImage(file,aspect){const url=URL.createObjectURL(file);try{const img=await loadImg(url);const c=cvs(480,Math.round(480*aspect),(x,w,h)=>{const s=Math.max(w/img.width,h/img.height);x.drawImage(img,(w-img.width*s)/2,(h-img.height*s)/2,img.width*s,img.height*s)});return await new Promise(ok=>c.toBlob(ok,"image/jpeg",.88))}finally{URL.revokeObjectURL(url)}}
+async function ingest(file,title,dir,coverFile){
+ const head=new Uint8Array(await file.slice(0,5).arrayBuffer());if(String.fromCharCode(...head)!=="%PDF-")throw new Error(file.name+" is not a PDF file.");
+ const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await file.arrayBuffer()),isEvalSupported:false}).promise;
+ try{const p=await pdf.getPage(1),v=p.getViewport({scale:1}),aspect=v.height/v.width,s=420/v.width,vp=p.getViewport({scale:s});
+  const c=document.createElement("canvas");c.width=vp.width;c.height=vp.height;const cx=c.getContext("2d");cx.fillStyle="#fff";cx.fillRect(0,0,c.width,c.height);await p.render({canvasContext:cx,viewport:vp}).promise;
+  let pref=null;try{const vpf=await pdf.getViewerPreferences();pref=vpf&&vpf.Direction}catch(e){}
+  const rtl=dir==="rtl"||(dir==="auto"&&(pref==="R2L"||isAr(title)));
+  return{id:uid(),title,pages:pdf.numPages,aspect:clamp(aspect,.9,2),rtl,added:Date.now(),pdf:file,cover:coverFile?await coverFromImage(coverFile,aspect):null,autoCover:c.toDataURL("image/jpeg",.85),spread:0}}
+ finally{pdf.destroy()}}
+
+/* ---------- dialog ---------- */
+let dMode="add",dId=null;
+function openDlg(mode,id){if(!started)return;dMode=mode;dId=id;ui(true);$("dmsg").textContent="";["df","dc"].forEach(i=>$(i).value="");
+ const b=mode==="edit"?BK.find(x=>x.rec.id===id):null;$("dh").textContent=b?"Edit book":"Add PDF books";$("frow").style.display=b?"none":"";$("dclrow").style.display=b?"":"none";$("dclr").checked=false;
+ $("dt").value=b?b.rec.title:"";$("dd").value=b?(b.rec.rtl?"rtl":"ltr"):"auto";$("dtn").style.display=b?"none":"";$("dcn").textContent=b?"Choose an image to replace the cover.":"Without one, the cover is taken from the first page of your PDF.";$("dlg").classList.add("on");setTimeout(()=>(b?$("dt"):$("df")).focus(),30)}
+$("addbtn").onclick=()=>openDlg("add");$("dcancel").onclick=closeAll;
+$("df").onchange=()=>{const f=$("df").files;if(f.length===1&&!$("dt").value)$("dt").value=f[0].name.replace(/\.pdf$/i,"")};
+$("dsave").onclick=async()=>{const btn=$("dsave");btn.disabled=true;try{
+ if(dMode==="add"){const files=[...$("df").files];if(!files.length)throw new Error("Choose at least one PDF file.");
+  const bad=files.find(f=>!/\.pdf$/i.test(f.name)&&f.type!=="application/pdf");if(bad)throw new Error("Only PDF files are supported: "+bad.name);
+  const cover=files.length===1?$("dc").files[0]:null;let n=0;
+  for(const f of files){$("dmsg").textContent=`Adding ${++n} of ${files.length}…`;const title=(files.length===1&&$("dt").value.trim())||f.name.replace(/\.pdf$/i,"");
+   const rec=await ingest(f,title,$("dd").value,cover);try{await DB.put(rec)}catch(e){toast("Couldn’t save to this browser’s storage. This book will only last until you close the page.",6000)}await addBook(rec);layout()}
+  closeAll();toast(files.length+(files.length>1?" books added.":" book added."))}
+ else{const b=BK.find(x=>x.rec.id===dId),r=b.rec,t=$("dt").value.trim();if(!t)throw new Error("Please enter a title.");r.title=t;const d=$("dd").value;r.rtl=d==="auto"?isAr(t):d==="rtl";
+  if($("dc").files[0])r.cover=await coverFromImage($("dc").files[0],r.aspect);else if($("dclr").checked)r.cover=null;
+  await DB.put(r);await rebuild(b);layout();closeAll();toast("Saved.")}
+ }catch(e){$("dmsg").textContent=e.message||"Something went wrong."}finally{btn.disabled=false}};
+
+/* ---------- inspect (pick up a book) ---------- */
+let started=false,panelOpen=false,readerOpen=false,heldB=null,idelArm=0;
+function ui(on){panelOpen=on;if(on&&document.exitPointerLock)document.exitPointerLock();if(on)for(const k in keys)keys[k]=0}
+function closeAll(){$("dlg").classList.remove("on");if(heldB){heldB=null;held=null;$("inspect").classList.remove("on")}ui(false)}
+function pickUp(b){heldB=b;held=b.g;ui(true);$("ititle").textContent=b.rec.title;$("imeta").textContent=b.rec.pages+" pages · "+(b.rec.rtl?"right to left":"left to right");$("idel").textContent="Remove";idelArm=0;$("inspect").classList.add("on");$("iread").focus()}
+$("iback").onclick=closeAll;$("iedit").onclick=()=>{const id=heldB.rec.id;$("inspect").classList.remove("on");openDlg("edit",id)};
+$("idel").onclick=async()=>{if(!idelArm){idelArm=1;$("idel").textContent="Click again to remove";clearTimeout($("idel").t);$("idel").t=setTimeout(()=>{idelArm=0;$("idel").textContent="Remove"},3500);return}
+ const b=heldB;heldB=null;held=null;$("inspect").classList.remove("on");try{await DB.del(b.rec.id)}catch(e){}
+ scene.remove(b.g);disposeG(b.g);bookGroups.splice(bookGroups.indexOf(b.g),1);BK.splice(BK.indexOf(b),1);layout();ui(false);toast("Removed.")};
+$("iread").onclick=()=>{const b=heldB;heldB=null;held=null;$("inspect").classList.remove("on");openReader(b)};
+
+/* ---------- reader ---------- */
+let pdf=null,rec=null,N=0,k=0,maxK=0,rtl=false,zoom=1,busy=false,SW_=0,SH_=0,ratio=.707;
+const sl={L:$("sL"),R:$("sR")},leaf=$("leaf"),fF=leaf.children[0],fB=leaf.children[1];
+const pagesOf=kk=>rtl?[2*kk+1,2*kk]:[2*kk,2*kk+1],valid=n=>n>=1&&n<=N;
+async function draw(box,n){const cv=box.querySelector("canvas");if(cv._t){try{cv._t.cancel()}catch(e){}}
+ if(!valid(n)){box.classList.add("empty");return}box.classList.remove("empty");
+ const page=await pdf.getPage(n),v0=page.getViewport({scale:1}),s=Math.min(SW_/v0.width,SH_/v0.height),dpr=Math.min(devicePixelRatio||1,2),vp=page.getViewport({scale:s*dpr});
+ cv.width=Math.round(vp.width);cv.height=Math.round(vp.height);cv.style.width=vp.width/dpr+"px";cv.style.height=vp.height/dpr+"px";
+ const t=page.render({canvasContext:cv.getContext("2d"),viewport:vp});cv._t=t;try{await t.promise}catch(e){}}
+function copy(src,dst,srcBox,dstBox){const a=src.querySelector("canvas"),b=dst.querySelector("canvas");dstBox.classList.toggle("empty",srcBox.classList.contains("empty"));b.width=a.width;b.height=a.height;b.style.width=a.style.width;b.style.height=a.style.height;b.getContext("2d").drawImage(a,0,0)}
+function sizes(){const st=$("stage"),w=st.clientWidth-60,h=st.clientHeight-50;SH_=Math.round(Math.min(h,w/2/ratio)*zoom);SW_=Math.round(SH_*ratio);
+ for(const e of [sl.L,sl.R,fF,fB]){e.style.width=SW_+"px";e.style.height=SH_+"px"}leaf.style.width=SW_+"px";leaf.style.height=SH_+"px"}
+function info(){const p=pagesOf(k).filter(valid).sort((a,b)=>a-b);$("rpage").textContent=(p.length?p.join("–"):"")+" / "+N;$("slider").value=p[0]||1;$("slider").max=N}
+async function setSpread(nk){k=clamp(nk,0,maxK);const p=pagesOf(k);info();await Promise.all([draw(sl.L,p[0]),draw(sl.R,p[1])]);saveSpread()}
+let saveT;function saveSpread(){rec.spread=k;clearTimeout(saveT);saveT=setTimeout(()=>DB.put(rec).catch(()=>{}),400)}
+async function turn(fwd){if(busy||!pdf)return;const nk=k+(fwd?1:-1);if(nk<0||nk>maxK)return;busy=true;
+ const ts=(fwd===!rtl)?"R":"L",ls=ts==="R"?"L":"R",np=pagesOf(nk),ix=s=>s==="L"?0:1;
+ copy(sl[ts],fF,sl[ts],fF);leaf.style.left=ts==="R"?SW_+"px":"0px";leaf.style.transformOrigin=ts==="R"?"left center":"right center";leaf.style.display="block";leaf.style.transform="none";
+ await Promise.all([draw(fB,np[ix(ls)]),draw(sl[ts],np[ix(ts)])]);
+ const ang=ts==="R"?-180:180,a=leaf.animate([{transform:"rotateY(0deg)",boxShadow:"0 0 0 rgba(0,0,0,0)"},{boxShadow:"0 0 50px rgba(0,0,0,.55)",offset:.5},{transform:`rotateY(${ang}deg)`,boxShadow:"0 0 0 rgba(0,0,0,0)"}],{duration:850,easing:"cubic-bezier(.5,0,.25,1)",fill:"forwards"});
+ await new Promise(ok=>{a.onfinish=ok;a.oncancel=ok});
+ copy(fB,sl[ls],fB,sl[ls]);a.cancel();leaf.style.display="none";k=nk;info();saveSpread();busy=false}
+async function openReader(b){rec=b.rec;rtl=rec.rtl;zoom=1;ui(true);readerOpen=true;$("reader").classList.add("on");$("spin").style.display="block";$("rtitle").textContent=rec.title;
+ try{const buf=new Uint8Array(await rec.pdf.arrayBuffer());pdf=await pdfjsLib.getDocument({data:buf,isEvalSupported:false}).promise;N=pdf.numPages;maxK=Math.floor(N/2);
+  const p1=await pdf.getPage(1),v=p1.getViewport({scale:1});ratio=v.width/v.height;sizes();$("rdir").textContent=rtl?"Direction: RTL":"Direction: LTR";await setSpread(rec.spread||0)}
+ catch(e){toast("This PDF couldn’t be opened.",5000);closeReader();return}finally{$("spin").style.display="none"}}
+function closeReader(){if(document.fullscreenElement)document.exitFullscreen().catch(()=>{});readerOpen=false;$("reader").classList.remove("on");if(pdf){pdf.destroy();pdf=null}ui(false)}
+$("rback").onclick=closeReader;
+$("pl").onclick=()=>turn(rtl);$("pr").onclick=()=>turn(!rtl);sl.L.onclick=()=>turn(rtl);sl.R.onclick=()=>turn(!rtl);
+$("slider").oninput=e=>{if(!busy)setSpread(Math.floor(+e.target.value/2))};
+const rez=()=>{if(!pdf||busy)return;sizes();setSpread(k)};
+$("zp").onclick=()=>{zoom=Math.min(3,zoom*1.25);rez()};$("zm").onclick=()=>{zoom=Math.max(.5,zoom/1.25);rez()};$("zf").onclick=()=>{zoom=1;rez()};
+$("rdir").onclick=async()=>{if(busy||!pdf)return;const p=Math.max(1,pagesOf(k).filter(valid)[0]||1);rtl=!rtl;rec.rtl=rtl;$("rdir").textContent=rtl?"Direction: RTL":"Direction: LTR";await setSpread(Math.floor(p/2));DB.put(rec).catch(()=>{});const b=BK.find(x=>x.rec===rec);if(b){await rebuild(b);layout()}};
+$("fs").onclick=()=>{const r=$("reader");if(document.fullscreenElement)document.exitFullscreen();else if(r.requestFullscreen)r.requestFullscreen().catch(()=>toast("Fullscreen isn’t available here."));else toast("Fullscreen isn’t available here.")};
+addEventListener("resize",()=>{cam.aspect=innerWidth/innerHeight;cam.updateProjectionMatrix();rd.setSize(innerWidth,innerHeight);if(readerOpen)rez()});
+
+/* ---------- controls ---------- */
+const keys={};let yaw=0,pitch=0,locked=false;const vel=new THREE.Vector3();
+const typing=e=>e.target.matches&&e.target.matches("input,textarea,select");
+addEventListener("keydown",e=>{
+ if(readerOpen){if(e.code==="ArrowRight")turn(!rtl);else if(e.code==="ArrowLeft")turn(rtl);else if(e.code==="Equal"||e.code==="NumpadAdd")$("zp").click();else if(e.code==="Minus"||e.code==="NumpadSubtract")$("zm").click();else if(e.code==="KeyF")$("fs").click();else if(e.code==="Escape"&&!document.fullscreenElement)closeReader();return}
+ if(typing(e)){if(e.code==="Escape")closeAll();return}
+ if(e.code==="Escape"&&panelOpen){closeAll();return}
+ keys[e.code]=1;if(e.code==="KeyE")pick(0,0);if(e.code==="KeyB")openDlg("add")});
+addEventListener("keyup",e=>keys[e.code]=0);
+$("enter").onclick=()=>{$("intro").style.display="none";started=true;try{gl.requestPointerLock()}catch(e){}};
+document.addEventListener("pointerlockchange",()=>locked=document.pointerLockElement===gl);
+let drag=null;const look=(dx,dy,s)=>{yaw-=dx*s;pitch=clamp(pitch-dy*s,-1.3,1.3)};
+gl.addEventListener("mousedown",e=>drag={x:e.clientX,y:e.clientY,m:0});
+addEventListener("mousemove",e=>{if(panelOpen)return;if(locked)look(e.movementX,e.movementY,.0022);else if(drag){look(e.clientX-drag.x,e.clientY-drag.y,.004);drag.m+=Math.abs(e.clientX-drag.x)+Math.abs(e.clientY-drag.y);drag.x=e.clientX;drag.y=e.clientY}});
+addEventListener("mouseup",e=>{if(!drag||!started||panelOpen||e.target!==gl){drag=null;return}
+ if(locked)pick(0,0);else if(drag.m<6){if(!pick(e.clientX/innerWidth*2-1,-(e.clientY/innerHeight)*2+1))try{gl.requestPointerLock()}catch(x){}}drag=null});
+let tL=null,tR=null;const tv={x:0,y:0},ndc=t=>[t.clientX/innerWidth*2-1,-(t.clientY/innerHeight)*2+1];
+gl.addEventListener("touchstart",e=>{for(const t of e.changedTouches){const o={id:t.identifier,x:t.clientX,y:t.clientY,sx:t.clientX,sy:t.clientY,t:Date.now()};if(t.clientX<innerWidth/2)tL=o;else tR=o}},{passive:true});
+gl.addEventListener("touchmove",e=>{if(panelOpen)return;for(const t of e.changedTouches){if(tL&&t.identifier===tL.id){tv.x=clamp((t.clientX-tL.sx)/50,-1,1);tv.y=clamp((t.clientY-tL.sy)/50,-1,1)}if(tR&&t.identifier===tR.id){look(t.clientX-tR.x,t.clientY-tR.y,.006);tR.x=t.clientX;tR.y=t.clientY}}},{passive:true});
+gl.addEventListener("touchend",e=>{for(const t of e.changedTouches){const o=tL&&t.identifier===tL.id?tL:tR&&t.identifier===tR.id?tR:null;if(!o)continue;if(Math.hypot(t.clientX-o.sx,t.clientY-o.sy)<8&&Date.now()-o.t<300)pick(...ndc(t));if(o===tL){tL=null;tv.x=tv.y=0}else tR=null}},{passive:true});
+const ray=new THREE.Raycaster();let hover=null;
+function hit(nx,ny){ray.setFromCamera({x:nx,y:ny},cam);ray.far=4;const h=ray.intersectObjects(bookGroups.filter(g=>g.visible),true)[0];if(!h)return null;let o=h.object;while(o&&!(o.userData&&o.userData.id))o=o.parent;return o?BK.find(b=>b.g===o):null}
+function pick(nx,ny){if(!started||panelOpen)return false;const b=hit(nx,ny);if(!b)return false;pickUp(b);return true}
+
+/* ---------- loop ---------- */
+const clock=new THREE.Clock(),fwd=new THREE.Vector3(),side=new THREE.Vector3(),tp=new THREE.Vector3(),tq=new THREE.Quaternion(),qy=new THREE.Quaternion(),Y=new THREE.Vector3(0,1,0),one=new THREE.Vector3(1,1,1),sc=new THREE.Vector3(),tmp=new THREE.Vector3();
+function tick(){const dt=Math.min(clock.getDelta(),.05),t=clock.elapsedTime;
+ if(started&&!panelOpen){const f=(keys.KeyW||keys.ArrowUp?1:0)-(keys.KeyS||keys.ArrowDown?1:0)-tv.y,s=(keys.KeyD?1:0)-(keys.KeyA?1:0)+tv.x;
+  if(keys.ArrowLeft)yaw+=dt*1.6;if(keys.ArrowRight)yaw-=dt*1.6;
+  fwd.set(-Math.sin(yaw),0,-Math.cos(yaw));side.set(Math.cos(yaw),0,-Math.sin(yaw));const sp=keys.ShiftLeft?4.5:2.4;
+  vel.multiplyScalar(Math.max(0,1-dt*9)).addScaledVector(fwd,f*sp*dt*3).addScaledVector(side,s*sp*dt*3);
+  const p=cam.position;p.x=clamp(p.x+vel.x*dt*3,-2.0,2.0);p.z=clamp(p.z+vel.z*dt*3,-2.7,2.7);p.y=1.6+Math.sin(t*8)*Math.min(vel.length(),1)*.015}
+ cam.rotation.set(pitch,yaw,0);
+ const nh=started&&!panelOpen?hit(0,0):null;
+ if(nh!==hover){hover=nh;$("cross").classList.toggle("on",!!nh);$("tip").classList.toggle("on",!!nh);if(nh){const tip=$("tip");tip.innerHTML="";const a=document.createElement("span");a.textContent=nh.rec.title;a.dir="auto";const s=document.createElement("small");s.textContent="click to pick up";tip.append(a,s)}}
+ for(const b of BK){const g=b.g;if(!b.home||!g.visible)continue;
+  if(g===held){cam.getWorldDirection(fwd);tp.copy(cam.position).addScaledVector(fwd,.72);tp.y-=.03;
+   qy.setFromAxisAngle(Y,(b.rec.rtl?1:-1)*Math.PI/2);tq.copy(cam.quaternion).multiply(qy);const sw=new THREE.Quaternion().setFromAxisAngle(Y,Math.sin(t*.8)*.25-.2);tq.multiply(sw);
+   g.position.lerp(tp,Math.min(1,dt*7));g.quaternion.slerp(tq,Math.min(1,dt*7));sc.set(1.9,1.9,1.9);g.scale.lerp(sc,Math.min(1,dt*7));g.userData.hov=0}
+  else{const on=b===hover?1:0;g.userData.hov+=(on-g.userData.hov)*Math.min(1,dt*10);tmp.copy(b.home.p).addScaledVector(b.home.n,.045*g.userData.hov);g.position.lerp(tmp,Math.min(1,dt*9));g.quaternion.slerp(b.home.q,Math.min(1,dt*9));g.scale.lerp(one,Math.min(1,dt*9))}
+  const e=g.userData.hov>.02?.35:0;g.userData.mats.forEach(m=>m.emissive.setScalar(e*.4*g.userData.hov))}
+ dust.rotation.y=t*.01;dust.position.y=Math.sin(t*.3)*.04;
+ rd.render(scene,cam);requestAnimationFrame(tick)}
+
+(async()=>{await DB.open();if(!DB.db)toast("This browser blocks local storage, so books will only last until you close the page.",6000);
+ try{const recs=(await DB.all()).sort((a,b)=>a.added-b.added);for(const r of recs)await addBook(r)}catch(e){toast("Couldn’t load your saved books.")}
+ layout();tick()})();
+</script>
+</body>
+</html>
